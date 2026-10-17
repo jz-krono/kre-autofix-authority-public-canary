@@ -1,0 +1,92 @@
+name: KRE canary user token assignment
+on:
+  workflow_dispatch:
+    inputs:
+      alert_number:
+        description: "Only CodeQL canary alert #2 is allowed"
+        required: true
+        type: string
+permissions: {}
+concurrency:
+  group: kre-canary-user-token-alert-2
+  cancel-in-progress: false
+jobs:
+  assign:
+    if: github.repository == 'jz-krono/kre-autofix-authority-public-canary' && github.ref == 'refs/heads/main' && inputs.alert_number == '2'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Validate exact canary and assign through REST API
+        env:
+          GH_TOKEN: ${{ secrets.KRE_CANARY_USER_TOKEN }}
+          ALERT_NUMBER: ${{ inputs.alert_number }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+          from urllib.error import HTTPError
+          from urllib.request import Request, urlopen
+
+          repo = "jz-krono/kre-autofix-authority-public-canary"
+          if (os.environ.get("GITHUB_REPOSITORY") != repo or
+                  os.environ.get("GITHUB_REF") != "refs/heads/main" or
+                  os.environ.get("ALERT_NUMBER") != "2"):
+              raise SystemExit("Canary identity or branch gate failed")
+          if not os.environ.get("GH_TOKEN"):
+              raise SystemExit("KRE_CANARY_USER_TOKEN secret is required")
+          url = "https://api.github.com/repos/" + repo + "/code-scanning/alerts/2"
+          headers = {
+              "Accept": "application/vnd.github+json",
+              "Authorization": "Bearer " + os.environ["GH_TOKEN"],
+              "X-GitHub-Api-Version": "2026-03-10",
+          }
+
+          def call(method, payload=None):
+              data = None if payload is None else json.dumps(payload).encode()
+              request = Request(url, data=data, headers=headers, method=method)
+              try:
+                  with urlopen(request, timeout=20) as response:
+                      return response.status, json.load(response), response.headers
+              except HTTPError as error:
+                  raw = error.read(10000)
+                  try:
+                      body = json.loads(raw)
+                  except ValueError:
+                      body = {}
+                  print("api_status=" + str(error.code))
+                  print("api_message=" + str(body.get("message", "unknown"))[:400])
+                  print("accepted_permissions=" +
+                        str(error.headers.get("X-Accepted-GitHub-Permissions", "")))
+                  print("github_request_id=" +
+                        str(error.headers.get("X-GitHub-Request-Id", "")))
+                  raise SystemExit(1)
+
+          status, before, _ = call("GET")
+          instance = before.get("most_recent_instance") or {}
+          location = instance.get("location") or {}
+          if (status != 200 or before.get("number") != 2 or
+                  before.get("state") != "open" or
+                  (before.get("rule") or {}).get("id") != "js/command-line-injection" or
+                  location.get("path") != "canary-api.js" or
+                  instance.get("ref") != "refs/heads/main" or
+                  before.get("assignees")):
+              raise SystemExit("Alert identity, rule, branch, or unassigned state differs")
+          print("preflight=exact_default_branch_alert_open")
+          print("actor=user_token_from_repository_secret")
+          print("requested_token_scope=code_scanning_alerts_write_contents_none")
+          print("run_id=" + os.environ["GITHUB_RUN_ID"])
+          print("workflow_sha=" + os.environ["GITHUB_SHA"])
+          status, assigned, response_headers = call(
+              "PATCH", {"assignees": ["copilot-swe-agent[bot]"]})
+          print("patch_status=" + str(status))
+          print("github_request_id=" +
+                str(response_headers.get("X-GitHub-Request-Id", "")))
+          if status != 200:
+              raise SystemExit("Assignment was not accepted")
+          _, after, _ = call("GET")
+          assignees = [user.get("login") for user in after.get("assignees", [])]
+          print("readback_assignees=" + json.dumps(assignees))
+          if "copilot-swe-agent[bot]" not in assignees:
+              raise SystemExit("Independent alert readback did not show delegation")
+          PY
