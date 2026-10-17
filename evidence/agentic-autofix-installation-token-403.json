@@ -1,0 +1,47 @@
+{
+  "schema": "kre-github-agentic-autofix-api-observation-v1",
+  "observed_at_utc": "2026-10-17T01:27:37Z",
+  "repository": "jz-krono/kre-autofix-authority-public-canary",
+  "workflow_run": "https://github.com/jz-krono/kre-autofix-authority-public-canary/actions/runs/38990936769",
+  "workflow_job_id": 117272977429,
+  "workflow_commit": "8ca3b965a97f564ed4f3b509fed54fcb5e3ff71e",
+  "alert_url": "https://github.com/jz-krono/kre-autofix-authority-public-canary/security/code-scanning/2",
+  "alert": {
+    "number": 2,
+    "rule_id": "js/command-line-injection",
+    "path": "canary-api.js",
+    "ref": "refs/heads/main",
+    "state_before": "open",
+    "assignees_before": [],
+    "assignees_after": []
+  },
+  "actor": {
+    "kind": "GitHub Actions GitHub App installation access token",
+    "permissions": [
+      "metadata:read",
+      "security-events:write",
+      "contents:none"
+    ]
+  },
+  "request": {
+    "method": "PATCH",
+    "endpoint": "/repos/jz-krono/kre-autofix-authority-public-canary/code-scanning/alerts/2",
+    "body": {
+      "assignees": [
+        "copilot-swe-agent[bot]"
+      ]
+    }
+  },
+  "response": {
+    "status": 403,
+    "message": "Assigning agents is not supported with GitHub App installation tokens. Use a user token (personal access token or OAuth token) instead.",
+    "accepted_permissions": "security_events=write",
+    "github_request_id": "6019:BCD96:5BE4B6:12FB651:6AD2CF09"
+  },
+  "effect": {
+    "assignment": "REJECTED",
+    "agent_session": "NOT_STARTED",
+    "pull_request": "NONE"
+  },
+  "classification": "PREFLIGHT_AUTHORITY_REJECTION_NOT_FACTORY_RECEIPT"
+}
